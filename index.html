@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Factory Noise Meter</title>
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0e11">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Noise Meter">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <h1>เครื่องวัดเสียงโรงงาน</h1>
+    <p>วัดระดับเสียงขณะเครื่องจักรทำงาน · dB(A) · Leq · Dose</p>
+  </div>
+  <div class="actions">
+    <button id="btnMic" class="btn primary" type="button">เริ่มวัดด้วยไมโครโฟน</button>
+    <button id="btnDemo" class="btn" type="button">โหมดจำลอง</button>
+    <button id="btnStop" class="btn danger" type="button" hidden>หยุดวัด</button>
+    <button id="btnReset" class="btn ghost" type="button">รีเซ็ตสถิติ</button>
+  </div>
+</header>
+
+<div id="notice" class="notice" role="alert" hidden></div>
+
+<main class="grid">
+
+  <!-- ระดับเสียงขณะนี้ -->
+  <section class="card hero" id="hero" data-zone="idle" aria-label="ระดับเสียงขณะนี้">
+    <div class="hero-head">
+      <span class="label">ระดับเสียงขณะนี้</span>
+      <span id="status" class="status">ยังไม่เริ่มวัด</span>
+    </div>
+
+    <div class="readout" aria-live="off">
+      <span id="level">--</span><span class="unit" id="unit">dB(A)</span>
+    </div>
+    <div id="zone" class="zone">รอเริ่มวัด</div>
+
+    <div class="meter" id="meter">
+      <div class="meter-cover" id="meterCover"></div>
+      <div class="meter-hold" id="meterHold"></div>
+    </div>
+    <div class="ticks" id="ticks"></div>
+
+    <dl class="stats">
+      <div><dt>Leq (เฉลี่ยพลังงาน)</dt><dd id="sLeq">--</dd></div>
+      <div><dt>Lmax</dt><dd id="sMax">--</dd></div>
+      <div><dt>Lmin</dt><dd id="sMin">--</dd></div>
+      <div><dt>Lpeak (ไม่ถ่วงน้ำหนัก)</dt><dd id="sPeak">--</dd></div>
+      <div><dt>เวลาที่เกินเกณฑ์</dt><dd id="sOver">0:00</dd></div>
+      <div><dt>เวลาวัดสะสม</dt><dd id="sTime">0:00</dd></div>
+      <div class="wide"><dt>เวลาสัมผัสที่ยอมรับได้ ณ ระดับนี้</dt><dd id="sAllow">--</dd></div>
+      <div class="wide"><dt>Dose ถ้าระดับนี้ต่อเนื่อง 8 ชม. · TWA</dt><dd id="sDose">--</dd></div>
+    </dl>
+  </section>
+
+  <!-- กราฟ -->
+  <section class="card charts">
+    <div class="card-head">
+      <h2>ระดับเสียงย้อนหลัง 2 นาที</h2>
+      <span class="hint" id="clip" hidden>⚠ สัญญาณเกินช่วงไมโครโฟน (clipping) ค่าที่วัดต่ำกว่าจริง ให้ถอยไมค์ออกหรือลดเกนในระบบ</span>
+    </div>
+    <canvas id="hist" class="chart" height="230"></canvas>
+
+    <div class="card-head spaced">
+      <h2>สเปกตรัมความถี่ (ย่านอ็อกเตฟ)</h2>
+      <span class="hint" id="dominant">ย่านเด่น: --</span>
+    </div>
+    <canvas id="spec" class="chart" height="200"></canvas>
+  </section>
+
+  <!-- บันทึกจุดวัด -->
+  <section class="card measure">
+    <div class="card-head">
+      <h2>บันทึกผลวัดเครื่องจักร</h2>
+      <span class="hint">เฉลี่ยตามเวลาที่เลือก แล้วเก็บเป็นรายการ</span>
+    </div>
+
+    <div class="form">
+      <label>เครื่องจักร
+        <input id="fMachine" type="text" placeholder="เช่น เครื่องปั๊ม #3" autocomplete="off">
+      </label>
+      <label>สถานะการทำงาน
+        <input id="fState" type="text" list="states" placeholder="เช่น ทำงานปกติ" autocomplete="off">
+        <datalist id="states">
+          <option value="พื้นหลัง (เครื่องหยุด)">
+          <option value="เดินเครื่องเปล่า">
+          <option value="ทำงานปกติ">
+          <option value="โหลดสูงสุด">
+          <option value="เริ่มเดินเครื่อง">
+        </datalist>
+      </label>
+      <label>จุดวัด
+        <input id="fPoint" type="text" placeholder="เช่น ห่างเครื่อง 1 ม. / ที่หูผู้ปฏิบัติงาน" autocomplete="off">
+      </label>
+      <label>ระยะเวลา
+        <select id="fDur">
+          <option value="10">10 วินาที</option>
+          <option value="30" selected>30 วินาที</option>
+          <option value="60">1 นาที</option>
+          <option value="300">5 นาที</option>
+          <option value="900">15 นาที</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="rec-row">
+      <button id="btnRec" class="btn primary" type="button">เริ่มบันทึกจุดวัด</button>
+      <div class="progress" id="progress" hidden><div id="progressBar"></div></div>
+      <span id="recText" class="hint"></span>
+    </div>
+
+    <div class="table-wrap">
+      <table id="logTable">
+        <thead>
+          <tr>
+            <th>เวลา</th><th>เครื่องจักร</th><th>สถานะ</th><th>จุดวัด</th>
+            <th class="n">Leq</th><th class="n">Lmax</th><th class="n">L10</th><th class="n">L90</th><th>ผล</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="logBody"></tbody>
+      </table>
+      <p id="logEmpty" class="empty">ยังไม่มีผลวัด — เริ่มวัดแล้วกด “เริ่มบันทึกจุดวัด”</p>
+    </div>
+
+    <div class="rec-row">
+      <button id="btnCsv" class="btn" type="button">ส่งออก CSV (เปิดใน Excel)</button>
+      <button id="btnClearLog" class="btn ghost" type="button">ล้างรายการ</button>
+    </div>
+  </section>
+
+  <!-- เหตุการณ์ -->
+  <section class="card events">
+    <div class="card-head"><h2>เหตุการณ์เสียงดังเกินเกณฑ์</h2><span class="hint">ต่อเนื่องเกิน 1 วินาที</span></div>
+    <ol id="evList" class="ev-list"></ol>
+    <p id="evEmpty" class="empty">ยังไม่มีเหตุการณ์</p>
+  </section>
+
+  <!-- ตั้งค่า -->
+  <section class="card settings">
+    <div class="card-head"><h2>ตั้งค่า</h2></div>
+
+    <div class="form">
+      <label>ถ่วงน้ำหนักความถี่
+        <select data-set="weighting">
+          <option value="A">A (dB(A)) — ตามการได้ยินของคน</option>
+          <option value="Z">Z (dB) — ไม่ถ่วงน้ำหนัก</option>
+        </select>
+      </label>
+      <label>ถ่วงน้ำหนักเวลา
+        <select data-set="speed">
+          <option value="F">Fast (125 ms)</option>
+          <option value="S">Slow (1 วินาที)</option>
+        </select>
+      </label>
+      <label>เกณฑ์เฝ้าระวัง (dB)
+        <input type="number" data-set="warn" step="1" min="40" max="130">
+      </label>
+      <label>เกณฑ์จำกัด (dB)
+        <input type="number" data-set="limit" step="1" min="40" max="130">
+      </label>
+      <label>เกณฑ์อันตราย (dB)
+        <input type="number" data-set="danger" step="1" min="40" max="140">
+      </label>
+      <label>วิธีคำนวณ Dose
+        <select data-set="dose">
+          <option value="niosh">NIOSH — 85 dB(A), exchange 3 dB</option>
+          <option value="oshaHca">OSHA Hearing Conservation — 85, exchange 5 dB</option>
+          <option value="oshaPel">OSHA PEL — 90, exchange 5 dB</option>
+        </select>
+      </label>
+      <label>ไมโครโฟน
+        <select id="selDevice" data-set="deviceId"><option value="">ค่าเริ่มต้นของเครื่อง</option></select>
+      </label>
+    </div>
+
+    <details class="calib">
+      <summary>ปรับเทียบ (Calibration)</summary>
+      <p class="hint">
+        ไมค์แต่ละตัวไวไม่เท่ากัน ค่าที่ได้จึงต้องปรับเทียบก่อนใช้งานจริง วางไมค์ข้างเครื่องวัดเสียงมาตรฐาน
+        (หรือ sound calibrator 94 dB) แล้วกรอกค่าที่เครื่องมาตรฐานอ่านได้ จากนั้นกด “ปรับเทียบ”
+      </p>
+      <div class="form">
+        <label>ค่าอ้างอิง (dB)
+          <input id="calRef" type="number" step="0.1" placeholder="เช่น 94">
+        </label>
+        <label>ค่า Offset ปัจจุบัน (dB)
+          <input type="number" data-set="cal" step="0.1">
+        </label>
+      </div>
+      <div class="rec-row">
+        <button id="btnCal" class="btn" type="button">ปรับเทียบจากค่าที่กำลังวัด</button>
+        <span id="calText" class="hint"></span>
+      </div>
+    </details>
+
+    <div class="rec-row">
+      <label class="check"><input type="checkbox" id="chkWake" checked> เปิดหน้าจอค้างไว้ขณะวัด</label>
+      <label class="demo-level" id="demoWrap" hidden>ความดังจำลอง
+        <input type="range" id="demoLevel" min="45" max="115" step="1" value="82">
+        <output id="demoOut">82</output>
+      </label>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <p>
+    ค่าที่ได้เป็นค่าประมาณจากไมโครโฟนทั่วไป ไม่ใช่เครื่องวัดระดับเสียงมาตรฐาน IEC 61672
+    เหมาะกับการสำรวจเบื้องต้นและการเฝ้าระวัง ไม่ใช่ผลตรวจวัดตามกฎหมาย
+    หากต้องการผลทางกฎหมายให้ใช้ Sound Level Meter / Noise Dosimeter ที่สอบเทียบแล้ว
+  </p>
+  <p>ใช้งานบน <code>http://localhost</code> เท่านั้น — ถ้าเปิดจากเครื่องอื่นผ่าน http ธรรมดา เบราว์เซอร์จะบล็อกไมโครโฟน (ต้องใช้ https)</p>
+</footer>
+
+<script src="app.js"></script>
+<script>
+  // ติดตั้งเป็นแอป/ใช้ออฟไลน์ (ทำงานบน https หรือ localhost เท่านั้น)
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  }
+</script>
+</body>
+</html>
