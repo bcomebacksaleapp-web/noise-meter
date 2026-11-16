@@ -1,6 +1,6 @@
 // Service worker: เก็บไฟล์แอปไว้ในเครื่อง เปิดออฟไลน์ได้หลังเปิดครั้งแรก
 // เปลี่ยนเลข VERSION ทุกครั้งที่แก้ไฟล์ เพื่อให้เครื่องที่ติดตั้งไว้อัปเดตตาม
-const VERSION = 'noise-meter-v1';
+const VERSION = 'noise-meter-v2';
 const FILES = [
   './', './index.html', './style.css', './app.js',
   './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png',

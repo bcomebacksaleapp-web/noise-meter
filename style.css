@@ -172,7 +172,7 @@ button, .btn { touch-action: manipulation; }
 .form { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
 label { display: flex; flex-direction: column; gap: 5px; font-size: 13px; color: var(--mute); font-weight: 600; }
 input[type=text], input[type=number], select {
-  font: inherit; font-size: 15px; color: var(--text);
+  font: inherit; font-size: 16px; color: var(--text);   /* <16px ทำให้ iOS ซูมหน้าเองตอนแตะช่องกรอก */
   background: #0f1418; border: 1px solid var(--line); border-radius: 9px;
   min-height: 42px; padding: 0 12px; width: 100%;
 }
